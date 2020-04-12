@@ -52,16 +52,15 @@ public:
     void push(T el) {
         Node<T> *node = head;
         bool expected = false;
-        if (!node->isUsed.compare_exchange_weak(expected, true)) {
-            if (!node->next->isHead) {
-                do {
-                    node = node->next;
-                } while (!node->isHead &&
-                         !node->isUsed.compare_exchange_weak(expected, true));
-            }
+        if (!node->isUsed.compare_exchange_strong(expected, true)) {
+            do {
+                node = node->next;
+            } while (!node->isHead &&
+                     !node->isUsed.compare_exchange_strong(expected, true));
             if (node->isHead) {
                 node = node->createNewNext();
                 head->next = node->createNewNext();
+                node->isUsed = true;
             }
         }
 
@@ -69,21 +68,13 @@ public:
         node->isUsed = false;
     }
 
-    std::mutex m2;
-
     void pop() {
-        Node<T> *prev;
-        Node<T> *nodeToPop;
-
-        do {
-            prev = getPrevPriorNode();
-            nodeToPop = prev->next;
-        } while (!m2.try_lock());
+        Node<T> *prev = getPrevPriorNode();
+        Node<T> *nodeToPop = prev->next;
         nodeToPop->pop();
         if (nodeToPop->readyToDelete()) {
             prev->next = nodeToPop->next;
         }
-        m2.unlock();
     }
 
     T top() {
