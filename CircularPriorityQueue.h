@@ -31,6 +31,7 @@ class CircularPriorityQueue {
 
         do {
             T value = node->top();
+
             if (priorValue == CPQ_NULL || (value != CPQ_NULL && priorValue < value)) {
                 priorValue = value;
                 prevPriorNode = prevNode;
@@ -51,17 +52,16 @@ public:
     void push(T el) {
         Node<T> *node = head;
         bool expected = false;
-        if (!node->isUsed.compare_exchange_weak(expected, true, std::memory_order_seq_cst)) {
+        if (!node->isUsed.compare_exchange_weak(expected, true)) {
             if (!node->next->isHead) {
                 do {
                     node = node->next;
                 } while (!node->isHead &&
-                         !node->isUsed.compare_exchange_weak(expected, true, std::memory_order_seq_cst));
+                         !node->isUsed.compare_exchange_weak(expected, true));
             }
             if (node->isHead) {
-                Node<T> *next = node->createNewNext();
-                head->next = next;
-                node = next;
+                node = node->createNewNext();
+                head->next = node->createNewNext();
             }
         }
 
@@ -69,21 +69,27 @@ public:
         node->isUsed = false;
     }
 
-    void pop() {
-        Node<T> *prev = getPrevPriorNode();
-        Node<T> *nodeToPop = prev->next;
+    std::mutex m2;
 
+    void pop() {
+        Node<T> *prev;
+        Node<T> *nodeToPop;
+
+        do {
+            prev = getPrevPriorNode();
+            nodeToPop = prev->next;
+        } while (!m2.try_lock());
         nodeToPop->pop();
         if (nodeToPop->readyToDelete()) {
             prev->next = nodeToPop->next;
         }
+        m2.unlock();
     }
 
     T top() {
         Node<T> *prev = getPrevPriorNode();
         return prev->next->top();
     }
-
 
     bool isEmpty() {
         Node<T> *node = head;
@@ -96,7 +102,25 @@ public:
         return true;
     }
 
+    int size() {
+        int size = 0;
+        Node<T> *node = head;
+        do {
+            size += node->size();
+            node = node->next;
+        } while (node != head);
+        return size;
+    }
 
+    int nodes() {
+        int size = 0;
+        Node<T> *node = head;
+        do {
+            ++size;
+            node = node->next;
+        } while (node != head);
+        return size;
+    }
 };
 
 #endif //CIRCULARPRIORITYQUEUE_CIRCULARPRIORITYQUEUE_H

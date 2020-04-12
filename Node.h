@@ -18,8 +18,8 @@ template<typename T>
 class Node {
     boost::heap::priority_queue<T> structure;
 public:
-    std::atomic<bool> isUsed;
-    std::atomic<bool> isHead;
+    std::atomic<bool> isUsed = false;
+    bool isHead;
     Node<T> *next = nullptr;
 
     Node<T>(bool isHead) {
@@ -42,6 +42,7 @@ public:
         if (isEmpty()) {
             return CPQ_NULL;
         }
+
         return structure.top();
     }
 
