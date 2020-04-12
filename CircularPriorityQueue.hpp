@@ -2,15 +2,15 @@
 // Created by komdosh on 05.04.2020.
 //
 
-#ifndef CIRCULARPRIORITYQUEUE_CIRCULARPRIORITYQUEUE_H
-#define CIRCULARPRIORITYQUEUE_CIRCULARPRIORITYQUEUE_H
+#ifndef CIRCULARPRIORITYQUEUE_CIRCULARPRIORITYQUEUE_HPP
+#define CIRCULARPRIORITYQUEUE_CIRCULARPRIORITYQUEUE_HPP
 
 #include "boost/heap/priority_queue.hpp"
 #include <mutex>
 #include <iostream>
 #include <thread>
 #include <atomic>
-#include "Node.h"
+#include "Node.hpp"
 
 #define CPQ_NULL INT32_MIN
 
@@ -52,15 +52,15 @@ public:
     void push(T el) {
         Node<T> *node = head;
         bool expected = false;
-        if (!node->isUsed.compare_exchange_strong(expected, true)) {
+        if (!node->isUsed.compare_exchange_weak(expected, true, std::memory_order_relaxed)) {
+            int counter = 0;
             do {
                 node = node->next;
             } while (!node->isHead &&
-                     !node->isUsed.compare_exchange_strong(expected, true));
+                     !node->isUsed.compare_exchange_weak(expected, true, std::memory_order_relaxed));
             if (node->isHead) {
                 node = node->createNewNext();
                 head->next = node->createNewNext();
-                node->isUsed = true;
             }
         }
 
@@ -71,9 +71,10 @@ public:
     void pop() {
         Node<T> *prev = getPrevPriorNode();
         Node<T> *nodeToPop = prev->next;
-        nodeToPop->pop();
-        if (nodeToPop->readyToDelete()) {
+
+        if (nodeToPop->pop()) {
             prev->next = nodeToPop->next;
+            delete nodeToPop;
         }
     }
 
@@ -114,4 +115,4 @@ public:
     }
 };
 
-#endif //CIRCULARPRIORITYQUEUE_CIRCULARPRIORITYQUEUE_H
+#endif //CIRCULARPRIORITYQUEUE_CIRCULARPRIORITYQUEUE_HPP

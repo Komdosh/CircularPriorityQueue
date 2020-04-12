@@ -4,7 +4,7 @@ project(CircularPriorityQueue)
 set(CMAKE_CXX_STANDARD 17)
 SET(CMAKE_CXX_FLAGS -pthread)
 
-find_package(Boost 1.65.1 COMPONENTS filesystem REQUIRED)
+find_package(Boost 1.58.0 COMPONENTS filesystem REQUIRED)
 if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
     add_executable(CircularPriorityQueue main.cpp)

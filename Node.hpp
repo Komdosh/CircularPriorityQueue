@@ -2,10 +2,9 @@
 // Created by komdosh on 05.04.2020.
 //
 
-#ifndef CIRCULARPRIORITYQUEUE_NODE_H
-#define CIRCULARPRIORITYQUEUE_NODE_H
+#ifndef CIRCULARPRIORITYQUEUE_NODE_HPP
+#define CIRCULARPRIORITYQUEUE_NODE_HPP
 
-#include "boost/heap/priority_queue.hpp"
 #include "boost/lockfree/queue.hpp"
 #include <mutex>
 #include <iostream>
@@ -17,8 +16,12 @@
 template<typename T>
 class Node {
     boost::heap::priority_queue<T> structure;
+
+    inline bool readyToDelete() {
+        return !isHead && isEmpty();
+    }
 public:
-    std::atomic<bool> isUsed = false;
+    std::atomic<bool> isUsed;
     bool isHead;
     Node<T> *next = nullptr;
 
@@ -31,11 +34,12 @@ public:
         structure.push(el);
     }
 
-    void pop() {
+    bool pop() {
         if (isEmpty()) {
-            return;
+            return true;
         }
         structure.pop();
+        return readyToDelete();
     }
 
     T top() {
@@ -52,9 +56,6 @@ public:
         return node;
     }
 
-    bool readyToDelete() {
-        return !isHead && isEmpty();
-    }
 
     inline bool isEmpty() {
         return structure.empty();
@@ -66,4 +67,4 @@ public:
 
 };
 
-#endif //CIRCULARPRIORITYQUEUE_NODE_H
+#endif //CIRCULARPRIORITYQUEUE_NODE_HPP

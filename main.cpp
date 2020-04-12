@@ -6,15 +6,16 @@
 #include <x86intrin.h>
 #include "macos/cpu_helper.h"
 #include "macos/pthread_helper.h"
-#include "CircularPriorityQueue.h"
+#include "CircularPriorityQueue.hpp"
+#include "boost/lockfree/queue.hpp"
 
 #define MAX_INSERTED_NUM 1000000
-//#define INSERT_ELEMENTS 15000000
-//#define DELETE_ELEMENTS 5000000
-//#define RANDOM_ELEMENTS 10000000
-#define INSERT_ELEMENTS 3000000
-#define DELETE_ELEMENTS 50000
-#define RANDOM_ELEMENTS 500000
+#define INSERT_ELEMENTS 15000000
+#define DELETE_ELEMENTS 5000000
+#define RANDOM_ELEMENTS 10000000
+//#define INSERT_ELEMENTS 10000000
+//#define DELETE_ELEMENTS 500000
+//#define RANDOM_ELEMENTS 1000000
 #define CPU_FRQ 4.3E9
 #define CORES 8
 #define METHODS 3*2
@@ -64,7 +65,7 @@ void printCSVThroughputByThreadsTable(int repeat) {
 void saveThroughput(const string &type, int threadId, uint64_t start, long numOfElement) {
     double secs = (__rdtsc() - start) / CPU_FRQ;
     auto throughput = static_cast<long>(numOfElement / secs);
-//    cout << "[" << type << "] " <<  throughput << " throughput per sec" << endl;
+    cout << "[" << type << "] " <<  throughput << " throughput per sec" << endl;
     if (type == "DELETE") {
         throughputDelete[threadId] = throughput;
     } else if (type == "INSERT") {
@@ -131,15 +132,18 @@ void *RunCPQExperiment(void *threadarg) {
     saveThroughput("INSERT", threadData->threadId, start, operationsCount);
 
     pthread_barrier_wait(&barrier);
-    operationsCount = INSERT_ELEMENTS / threadsCount;
+    operationsCount = DELETE_ELEMENTS / threadsCount;
     start = __rdtsc();
     for (int i = 0; i < operationsCount; ++i) {
+//        if(i%10000==0){{
+//            cout<<i<<endl;
+//        }}
         cpq->pop();
     }
     saveThroughput("DELETE", threadData->threadId, start, operationsCount);
 
     pthread_barrier_wait(&barrier);
-    operationsCount = INSERT_ELEMENTS / threadsCount;
+    operationsCount = RANDOM_ELEMENTS / threadsCount;
     start = __rdtsc();
     for (int i = 0; i < operationsCount; ++i) {
         int mode = rand_r(&seed) % 2;
@@ -211,7 +215,7 @@ void runExperiment(const cpu_set_t *cpuset, int numOfThreads, int repeat, bool u
 int main(int argc, char *argv[]) {
 
     cout
-            << "CircularPriorityQueue [numOfMaxCores:8] [skipTraditional:0/1] [startThreads:1..numOfMaxCores] [startRepeat:0..4]"
+            << "CircularPriorityQueue [numOfMaxCores:8] [skipTraditional:0/1] [startThreads:1..numOfMaxCores]"
             << endl;
     cpu_set_t cpuset[CORES];
 
@@ -225,16 +229,15 @@ int main(int argc, char *argv[]) {
     int numOfThreads = atoi(argv[1]);
     bool skipTraditional = atoi(argv[2]);
     int startThreads = atoi(argv[3]);
-    int startRepeats = atoi(argv[4]);
 
     cout
             << "Run parameters [numOfMaxCores:" << numOfThreads << "] [skipTraditional:" << skipTraditional
-            << "] [startThreads:" << startThreads << "] [startRepeat:" << startRepeats << "]"
+            << "] [startThreads:" << startThreads << "]"
             << endl;
 
     if (skipTraditional == 0) {
         for (int threads = startThreads; threads < numOfThreads + 1; ++threads) {
-            for (int repeat = startRepeats; repeat < REPEATS; ++repeat) {
+            for (int repeat = 0; repeat < REPEATS; ++repeat) {
                 priorityQueue = new boost::lockfree::queue<int>(128);
                 pthread_barrier_init(&barrier, nullptr, threads);
                 runExperiment(cpuset, threads, repeat, true);
@@ -246,7 +249,7 @@ int main(int argc, char *argv[]) {
 
 
     for (int threads = startThreads; threads < numOfThreads + 1; ++threads) {
-        for (int repeat = startRepeats; repeat < REPEATS; ++repeat) {
+        for (int repeat = 0; repeat < REPEATS; ++repeat) {
             cpq = new CircularPriorityQueue<int>();
             pthread_barrier_init(&barrier, nullptr, threads);
             runExperiment(cpuset, threads, repeat, false);
