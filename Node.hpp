@@ -21,7 +21,7 @@ class Node {
         return !isHead && isEmpty();
     }
 public:
-    std::atomic<bool> isUsed;
+    std::mutex usedMutex;
     bool isHead;
     Node<T> *next = nullptr;
 
@@ -34,25 +34,35 @@ public:
         structure.push(el);
     }
 
+    std::mutex popMutex;
     bool pop() {
+        popMutex.lock();
         if (isEmpty()) {
+            popMutex.unlock();
             return true;
         }
         structure.pop();
+        popMutex.unlock();
         return readyToDelete();
     }
 
+    std::mutex topMutex;
     T top() {
+        topMutex.lock();
         if (isEmpty()) {
+            topMutex.unlock();
             return CPQ_NULL;
         }
 
-        return structure.top();
+        T value = structure.top();
+        topMutex.unlock();
+        return value;
     }
 
     Node<T> *createNewNext() {
         Node *node = new Node<T>(false);
         node->next = next;
+        next = node;
         return node;
     }
 

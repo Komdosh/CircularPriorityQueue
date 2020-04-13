@@ -65,7 +65,7 @@ void printCSVThroughputByThreadsTable(int repeat) {
 void saveThroughput(const string &type, int threadId, uint64_t start, long numOfElement) {
     double secs = (__rdtsc() - start) / CPU_FRQ;
     auto throughput = static_cast<long>(numOfElement / secs);
-    cout << "[" << type << "] " <<  throughput << " throughput per sec" << endl;
+//    cout << "[" << type << "] " <<  throughput << " throughput per sec" << endl;
     if (type == "DELETE") {
         throughputDelete[threadId] = throughput;
     } else if (type == "INSERT") {
@@ -100,14 +100,17 @@ void *RunTraditionalPQExperiment(void *threadarg) {
     saveThroughput("DELETE", threadData->threadId, start, operationsCount);
 
     pthread_barrier_wait(&barrier);
+    seed = 0;
     operationsCount = RANDOM_ELEMENTS / threadsCount;
     start = __rdtsc();
     for (int i = 0; i < operationsCount; ++i) {
         int mode = rand_r(&seed) % 2;
-        if (mode == 0)
-            priorityQueue->push(i);
-        else
+        if (mode == 0) {
+            int insertedNum = rand_r(&seed) % MAX_INSERTED_NUM;
+            priorityQueue->push(insertedNum);
+        } else {
             priorityQueue->pop(a);
+        }
     }
     saveThroughput("RANDOM", threadData->threadId, start, operationsCount);
     pthread_barrier_wait(&barrier);
@@ -143,14 +146,17 @@ void *RunCPQExperiment(void *threadarg) {
     saveThroughput("DELETE", threadData->threadId, start, operationsCount);
 
     pthread_barrier_wait(&barrier);
+    seed = 0;
     operationsCount = RANDOM_ELEMENTS / threadsCount;
     start = __rdtsc();
     for (int i = 0; i < operationsCount; ++i) {
         int mode = rand_r(&seed) % 2;
-        if (mode == 0)
-            cpq->push(i);
-        else
+        if (mode == 0) {
+            int insertedNum = rand_r(&seed) % MAX_INSERTED_NUM;
+            cpq->push(insertedNum);
+        } else {
             cpq->pop();
+        }
     }
     saveThroughput("RANDOM", threadData->threadId, start, operationsCount);
     pthread_barrier_wait(&barrier);

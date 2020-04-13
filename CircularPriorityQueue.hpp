@@ -20,11 +20,12 @@ class CircularPriorityQueue {
 
     Node<T> *getPrevPriorNode() {
         Node<T> *node = head->next;
-        Node<T> *prevNode = head->next;
 
         if (node->isHead) {
             return node;
         }
+
+        Node<T> *prevNode = head->next;
 
         T priorValue = prevNode->top();
         Node<T> *prevPriorNode = prevNode;
@@ -51,21 +52,20 @@ public:
 
     void push(T el) {
         Node<T> *node = head;
-        bool expected = false;
-        if (!node->isUsed.compare_exchange_weak(expected, true, std::memory_order_relaxed)) {
-            int counter = 0;
+
+        if (!node->usedMutex.try_lock()) {
             do {
                 node = node->next;
             } while (!node->isHead &&
-                     !node->isUsed.compare_exchange_weak(expected, true, std::memory_order_relaxed));
+                     !node->usedMutex.try_lock());
             if (node->isHead) {
                 node = node->createNewNext();
-                head->next = node->createNewNext();
+                node->usedMutex.lock();
             }
         }
 
         node->push(el);
-        node->isUsed = false;
+        node->usedMutex.unlock();
     }
 
     void pop() {
@@ -74,7 +74,7 @@ public:
 
         if (nodeToPop->pop()) {
             prev->next = nodeToPop->next;
-            delete nodeToPop;
+//            delete nodeToPop;
         }
     }
 
