@@ -209,8 +209,8 @@ void runExperiment(const cpu_set_t *cpuset, int numOfThreads, int repeat, bool u
 //         << endl;
 
     int relaxedOffset = useTraditional ? 0 : 3;
-    throughputByThread[numOfThreads - 1][relaxedOffset] += throughputDeleteSum / REPEATS;
-    throughputByThread[numOfThreads - 1][relaxedOffset + 1] += throughputInsertSum / REPEATS;
+    throughputByThread[numOfThreads - 1][relaxedOffset] += throughputInsertSum / REPEATS;
+    throughputByThread[numOfThreads - 1][relaxedOffset + 1] += throughputDeleteSum / REPEATS;
     throughputByThread[numOfThreads - 1][relaxedOffset + 2] += throughputRandomSum / REPEATS;
 
     delete throughputDelete;
