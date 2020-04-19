@@ -20,6 +20,7 @@ class Node {
     inline bool readyToDelete() {
         return !isHead && isEmpty();
     }
+
 public:
     std::mutex usedMutex;
     bool isHead;
@@ -28,34 +29,30 @@ public:
     Node<T>(bool isHead) {
         this->isHead = isHead;
         next = this;
+        if (!isHead) {
+            usedMutex.lock();
+        }
     }
 
     void push(T el) {
         structure.push(el);
+        usedMutex.unlock();
     }
 
-    std::mutex popMutex;
     bool pop() {
-        popMutex.lock();
         if (isEmpty()) {
-            popMutex.unlock();
             return true;
         }
         structure.pop();
-        popMutex.unlock();
         return readyToDelete();
     }
 
-    std::mutex topMutex;
     T top() {
-        topMutex.lock();
         if (isEmpty()) {
-            topMutex.unlock();
             return CPQ_NULL;
         }
 
         T value = structure.top();
-        topMutex.unlock();
         return value;
     }
 
@@ -74,7 +71,6 @@ public:
     int size() {
         return structure.size();
     }
-
 };
 
 #endif //CIRCULARPRIORITYQUEUE_NODE_HPP

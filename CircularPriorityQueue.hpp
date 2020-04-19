@@ -18,7 +18,7 @@ template<typename T>
 class CircularPriorityQueue {
     Node<T> *head = nullptr;
 
-    Node<T> *getPrevPriorNode() {
+    Node<T> *getPrevPriorNode(bool isPop = false) {
         Node<T> *node = head->next;
 
         if (node->isHead) {
@@ -26,20 +26,21 @@ class CircularPriorityQueue {
         }
 
         Node<T> *prevNode = head->next;
-
-        T priorValue = prevNode->top();
         Node<T> *prevPriorNode = prevNode;
 
         do {
-            T value = node->top();
+            T priorValue = prevNode->top();
+            do {
+                T value = node->top();
 
-            if (priorValue == CPQ_NULL || (value != CPQ_NULL && priorValue < value)) {
-                priorValue = value;
-                prevPriorNode = prevNode;
-            }
-            node = node->next;
-            prevNode = node;
-        } while (!node->isHead);
+                if (priorValue == CPQ_NULL || (value != CPQ_NULL && priorValue < value)) {
+                    priorValue = value;
+                    prevPriorNode = prevNode;
+                }
+                node = node->next;
+                prevNode = node;
+            } while (!node->isHead);
+        } while (isPop && prevPriorNode->next->usedMutex.try_lock());
 
         return prevPriorNode;
     }
@@ -53,28 +54,28 @@ public:
     void push(T el) {
         Node<T> *node = head;
 
-        if (!node->usedMutex.try_lock()) {
-            do {
-                node = node->next;
-            } while (!node->isHead &&
-                     !node->usedMutex.try_lock());
-            if (node->isHead) {
-                node = node->createNewNext();
-                node->usedMutex.lock();
+        do {
+            if (node->usedMutex.try_lock()) {
+                node->push(el);
+                return;
             }
-        }
+            node = node->next;
+        } while (!node->isHead);
+
+        node = node->createNewNext();
 
         node->push(el);
-        node->usedMutex.unlock();
     }
 
     void pop() {
-        Node<T> *prev = getPrevPriorNode();
+        Node<T> *prev = getPrevPriorNode(true);
         Node<T> *nodeToPop = prev->next;
 
-        if (nodeToPop->pop()) {
+        bool needToDelete = nodeToPop->pop();
+        nodeToPop->usedMutex.unlock();
+        if (needToDelete) {
             prev->next = nodeToPop->next;
-//            delete nodeToPop;
+            delete nodeToPop;
         }
     }
 
