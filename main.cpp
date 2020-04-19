@@ -7,11 +7,12 @@
 #include "macos/cpu_helper.h"
 #include "macos/pthread_helper.h"
 #include "CircularPriorityQueue.hpp"
-#include "boost/lockfree/queue.hpp"
+#include "multiqueues/Multiqueues.h"
+
 
 #define MAX_INSERTED_NUM 1000000
-#define INSERT_ELEMENTS 20000000
-#define DELETE_ELEMENTS 10000000
+#define INSERT_ELEMENTS 10000000
+#define DELETE_ELEMENTS 5000000
 #define RANDOM_ELEMENTS 4000000
 //#define INSERT_ELEMENTS 10000000
 //#define DELETE_ELEMENTS 500000
@@ -19,7 +20,7 @@
 #define CPU_FRQ 4.3E9
 #define CORES 8
 #define METHODS 3*2
-#define REPEATS 10
+#define REPEATS 5
 
 using namespace std;
 
@@ -35,7 +36,7 @@ long *throughputRandom;
 
 long throughputByThread[CORES][METHODS];
 
-boost::lockfree::queue<int> *priorityQueue;
+Multiqueues<int> *priorityQueue;
 
 pthread_barrier_t barrier;
 
@@ -64,7 +65,7 @@ void printCSVThroughputByThreadsTable(int repeat) {
 void saveThroughput(const string &type, int threadId, uint64_t start, long numOfElement) {
     double secs = (__rdtsc() - start) / CPU_FRQ;
     auto throughput = static_cast<long>(numOfElement / secs);
-    cout << "[" << type << "] " << throughput << " throughput per sec" << endl;
+//    cout << "[" << type << "] " << throughput << " throughput per sec" << endl;
     if (type == "DELETE") {
         throughputDelete[threadId] = throughput;
     } else if (type == "INSERT") {
@@ -84,7 +85,7 @@ void *RunTraditionalPQExperiment(void *threadarg) {
     uint64_t start = __rdtsc();
     for (int i = 0; i < operationsCount; ++i) {
         int insertedNum = rand_r(&seed) % MAX_INSERTED_NUM;
-        priorityQueue->push(insertedNum);
+        priorityQueue->insertByThreadId(insertedNum);
     }
     saveThroughput("INSERT", threadData->threadId, start, operationsCount);
 
@@ -93,7 +94,7 @@ void *RunTraditionalPQExperiment(void *threadarg) {
     operationsCount = DELETE_ELEMENTS / threadsCount;
     start = __rdtsc();
     for (int i = 0; i < operationsCount; ++i) {
-        priorityQueue->pop(a);
+        priorityQueue->deleteMaxByThreadOwn();
     }
     saveThroughput("DELETE", threadData->threadId, start, operationsCount);
 
@@ -102,18 +103,17 @@ void *RunTraditionalPQExperiment(void *threadarg) {
     operationsCount = RANDOM_ELEMENTS / threadsCount;
     start = __rdtsc();
     for (int i = 0; i < operationsCount; ++i) {
-        int mode = rand_r(&seed) % 4;
+        int mode = rand_r(&seed) % 3;
         if (mode == 0) {
-            priorityQueue->pop(a);
+            priorityQueue->deleteMaxByThreadOwn();
         } else {
             int insertedNum = rand_r(&seed) % MAX_INSERTED_NUM;
-            priorityQueue->push(insertedNum);
+            priorityQueue->insertByThreadId(insertedNum);
         }
     }
     saveThroughput("RANDOM", threadData->threadId, start, operationsCount);
-    pthread_barrier_wait(&barrier);
 
-    pthread_exit(nullptr);
+    return nullptr;
 }
 
 void *RunCPQExperiment(void *threadarg) {
@@ -144,16 +144,15 @@ void *RunCPQExperiment(void *threadarg) {
     operationsCount = RANDOM_ELEMENTS / threadsCount;
     start = __rdtsc();
     for (int i = 0; i < operationsCount; ++i) {
-        int mode = rand_r(&seed) % 2;
+        int mode = rand_r(&seed) % 3;
         if (mode == 0) {
+            cpq->pop();
+        } else {
             int insertedNum = rand_r(&seed) % MAX_INSERTED_NUM;
             cpq->push(insertedNum);
-        } else {
-            cpq->pop();
         }
     }
     saveThroughput("RANDOM", threadData->threadId, start, operationsCount);
-    pthread_barrier_wait(&barrier);
 
     return nullptr;
 }
@@ -190,7 +189,6 @@ void runExperiment(const cpu_set_t *cpuset, int numOfThreads, int repeat, bool u
     for (int i = 0; i < numOfThreads; i++) {
         pthread_join(threads[i], nullptr);
 
-        cout << "FINISHED" << endl;
         throughputDeleteSum += throughputDelete[i];
         throughputInsertSum += throughputInsert[i];
         throughputRandomSum += throughputRandom[i];
@@ -240,7 +238,7 @@ int main(int argc, char *argv[]) {
     if (skipTraditional == 0) {
         for (int threads = startThreads; threads < numOfThreads + 1; ++threads) {
             for (int repeat = 0; repeat < REPEATS; ++repeat) {
-                priorityQueue = new boost::lockfree::queue<int>(128);
+                priorityQueue = new Multiqueues<int>(threads, 2);
                 pthread_barrier_init(&barrier, nullptr, threads);
                 runExperiment(cpuset, threads, repeat, true);
                 pthread_barrier_destroy(&barrier);

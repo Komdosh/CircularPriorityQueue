@@ -18,7 +18,7 @@ template<typename T>
 class CircularPriorityQueue {
     Node<T> *head = nullptr;
 
-    Node<T> *getPrevPriorNode(bool isPop = false) {
+    Node<T> *getPrevPriorNode() {
         Node<T> *node = head->next;
 
         if (node->isHead) {
@@ -28,19 +28,17 @@ class CircularPriorityQueue {
         Node<T> *prevNode = head->next;
         Node<T> *prevPriorNode = prevNode;
 
+        T priorValue = prevNode->top();
         do {
-            T priorValue = prevNode->top();
-            do {
-                T value = node->top();
+            T value = node->top();
 
-                if (priorValue == CPQ_NULL || (value != CPQ_NULL && priorValue < value)) {
-                    priorValue = value;
-                    prevPriorNode = prevNode;
-                }
-                node = node->next;
-                prevNode = node;
-            } while (!node->isHead);
-        } while (isPop && prevPriorNode->next->usedMutex.try_lock());
+            if (priorValue == CPQ_NULL || (value != CPQ_NULL && priorValue < value)) {
+                priorValue = value;
+                prevPriorNode = prevNode;
+            }
+            node = node->next;
+            prevNode = node;
+        } while (!node->isHead);
 
         return prevPriorNode;
     }
@@ -57,6 +55,7 @@ public:
         do {
             if (node->usedMutex.try_lock()) {
                 node->push(el);
+                node->usedMutex.unlock();
                 return;
             }
             node = node->next;
@@ -65,18 +64,19 @@ public:
         node = node->createNewNext();
 
         node->push(el);
+        node->usedMutex.unlock();
     }
 
     void pop() {
-        Node<T> *prev = getPrevPriorNode(true);
+        Node<T> *prev = getPrevPriorNode();
         Node<T> *nodeToPop = prev->next;
 
+        nodeToPop->usedMutex.lock();
         bool needToDelete = nodeToPop->pop();
-        nodeToPop->usedMutex.unlock();
-        if (needToDelete) {
+        if (needToDelete && prev->next != nodeToPop->next) {
             prev->next = nodeToPop->next;
-            delete nodeToPop;
         }
+        nodeToPop->usedMutex.unlock();
     }
 
     T top() {

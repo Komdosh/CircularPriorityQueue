@@ -15,7 +15,7 @@
 
 template<typename T>
 class Node {
-    boost::heap::priority_queue<T> structure;
+    boost::heap::priority_queue<T> *structure = new boost::heap::priority_queue<T>;
 
     inline bool readyToDelete() {
         return !isHead && isEmpty();
@@ -23,7 +23,7 @@ class Node {
 
 public:
     std::mutex usedMutex;
-    bool isHead;
+    bool isHead = false;
     Node<T> *next = nullptr;
 
     Node<T>(bool isHead) {
@@ -35,15 +35,14 @@ public:
     }
 
     void push(T el) {
-        structure.push(el);
-        usedMutex.unlock();
+        structure->push(el);
     }
 
     bool pop() {
         if (isEmpty()) {
             return true;
         }
-        structure.pop();
+        structure->pop();
         return readyToDelete();
     }
 
@@ -52,24 +51,26 @@ public:
             return CPQ_NULL;
         }
 
-        T value = structure.top();
-        return value;
+        return structure->top();
     }
 
     Node<T> *createNewNext() {
         Node *node = new Node<T>(false);
         node->next = next;
         next = node;
+
         return node;
     }
 
-
     inline bool isEmpty() {
-        return structure.empty();
+        return structure->empty();
     }
 
     int size() {
-        return structure.size();
+        return structure->size();
+    }
+
+    ~Node() {
     }
 };
 
