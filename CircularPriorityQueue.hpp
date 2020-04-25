@@ -54,17 +54,14 @@ public:
 
         do {
             if (node->usedMutex.try_lock()) {
-                node->push(el);
-                node->usedMutex.unlock();
+                node->pushAndUnlock(el);
                 return;
             }
             node = node->next;
         } while (!node->isHead);
 
         node = node->createNewNext();
-
-        node->push(el);
-        node->usedMutex.unlock();
+        node->pushAndUnlock(el);
     }
 
     void pop() {

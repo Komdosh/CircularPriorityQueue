@@ -34,8 +34,13 @@ public:
         }
     }
 
-    void push(T el) {
+    inline void push(T el) {
         structure->push(el);
+    }
+
+    void pushAndUnlock(T el) {
+        push(el);
+        usedMutex.unlock();
     }
 
     bool pop() {

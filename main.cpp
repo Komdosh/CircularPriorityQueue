@@ -34,26 +34,28 @@ long *throughputInsert;
 long *throughputDelete;
 long *throughputRandom;
 
-long throughputByThread[CORES][METHODS];
+long **throughputByThread;
 
 Multiqueues<int> *priorityQueue;
 
 pthread_barrier_t barrier;
 
-void initThroughputByThread() {
-    for (int i = 0; i < CORES; ++i) {
+void initThroughputByThread(int threads) {
+    throughputByThread = new long *[threads];
+    for (int i = 0; i < threads; ++i) {
+        throughputByThread[i] = new long[METHODS];
         for (int j = 0; j < METHODS; ++j) {
             throughputByThread[i][j] = 0;
         }
     }
 }
 
-void printCSVThroughputByThreadsTable(int repeat) {
+void printCSVThroughputByThreadsTable(int repeat, int threads) {
     cout << endl;
     cout << "Repeat: " << repeat << endl;
     cout << "Thread,InsertTraditional,DeleteTraditional,RandomTraditional,InsertRelaxed,DeleteRelaxed,RandomRelaxed"
          << endl;
-    for (int i = 0; i < CORES; ++i) {
+    for (int i = 0; i < threads; ++i) {
         cout << i + 1 << ",";
         for (int j = 0; j < METHODS; ++j) {
             cout << throughputByThread[i][j] << ((j + 1 != METHODS) ? "," : "");
@@ -223,11 +225,11 @@ int main(int argc, char *argv[]) {
         CPU_SET(i, &cpuset[i]);
     }
 
-    initThroughputByThread();
-
     int numOfThreads = atoi(argv[1]);
     bool skipTraditional = atoi(argv[2]);
     int startThreads = atoi(argv[3]);
+
+    initThroughputByThread(numOfThreads);
 
     threadsCount = numOfThreads;
     cout
@@ -242,7 +244,7 @@ int main(int argc, char *argv[]) {
                 pthread_barrier_init(&barrier, nullptr, threads);
                 runExperiment(cpuset, threads, repeat, true);
                 pthread_barrier_destroy(&barrier);
-                printCSVThroughputByThreadsTable(repeat);
+                printCSVThroughputByThreadsTable(repeat, numOfThreads);
             }
         }
     }
@@ -254,7 +256,7 @@ int main(int argc, char *argv[]) {
             pthread_barrier_init(&barrier, nullptr, threads);
             runExperiment(cpuset, threads, repeat, false);
             pthread_barrier_destroy(&barrier);
-            printCSVThroughputByThreadsTable(repeat);
+            printCSVThroughputByThreadsTable(repeat, numOfThreads);
         }
     }
 
